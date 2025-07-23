@@ -8,6 +8,7 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import SwiftCSV
 
 struct AirwayImmersiveView: View {
     @EnvironmentObject private var appModel: AirwayAppModel
@@ -20,6 +21,7 @@ struct AirwayImmersiveView: View {
     
     var body: some View {
         RealityView { content in
+            content.compositingMode = .foveated
             await setupImmersiveContent(content)
             immersiveContent = content
             
@@ -215,19 +217,65 @@ struct AirwayImmersiveView: View {
         
         let entity = try await Entity(contentsOf: meshURL)
         entity.name = "ImmersiveAirwayMesh_\(model.id)"
-        
+
+        if var modelComponent = entity.components[ModelComponent.self] {
+            let high = modelComponent.mesh
+            if let lod25 = try? MeshResource.generate(from: high, decimation: 0.25),
+               let lod10 = try? MeshResource.generate(from: high, decimation: 0.10),
+               let lod05 = try? MeshResource.generate(from: high, decimation: 0.05) {
+                modelComponent.lods = [
+                    .init(threshold: .init(screenSpaceRadius: 0.3), mesh: high),
+                    .init(threshold: .init(screenSpaceRadius: 0.2), mesh: lod25),
+                    .init(threshold: .init(screenSpaceRadius: 0.1), mesh: lod10),
+                    .init(threshold: .init(screenSpaceRadius: 0.05), mesh: lod05)
+                ]
+                entity.components.set(modelComponent)
+            }
+        }
+        entity.components.set(AccessibilityComponent(label: "Airway mesh", value: model.name))
+
         return entity
     }
     
     private func loadCenterlineData(for model: AirwayModel) async throws -> [CenterlinePoint] {
-        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "json", subdirectory: "PrebuiltModels/Centerlines") else {
+        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "csv", subdirectory: "PrebuiltModels/Centerlines") else {
             throw AirwayVisionError.centerlineNotFound
         }
-        
-        let data = try Data(contentsOf: centerlineURL)
-        let branches = try JSONDecoder().decode([AirwayBranch].self, from: data)
-        
-        return branches.flatMap { $0.centerlinePoints }
+
+        let csv = try CSV(url: centerlineURL)
+        var points: [CenterlinePoint] = []
+        var previous: SIMD3<Float>? = nil
+
+        for row in csv.namedRows {
+            guard let posString = row["EndPointPosition"],
+                  let radiusString = row["Radius"],
+                  let cellId = row["CellId"],
+                  let posValues = Float.split(from: posString) else { continue }
+
+            let position = SIMD3<Float>(posValues[0], posValues[1], posValues[2])
+            let direction: SIMD3<Float>
+            if let prev = previous {
+                direction = normalize(position - prev)
+            } else {
+                direction = SIMD3<Float>(0, 0, -1)
+            }
+            previous = position
+
+            let point = CenterlinePoint(
+                position: position,
+                direction: direction,
+                radius: Float(radiusString) ?? 0,
+                generation: Int(cellId) ?? 0,
+                branchId: cellId,
+                distanceFromStart: 0,
+                anatomicalLabel: nil,
+                pathologyInfo: nil,
+                landmarks: nil
+            )
+            points.append(point)
+        }
+
+        return points
     }
     
     private func createImmersiveCenterline(from points: [CenterlinePoint]) -> Entity {

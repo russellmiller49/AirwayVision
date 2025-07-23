@@ -1,0 +1,11 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "AirwayVision" : { "value" : "AirwayVision" },
+    "Virtual Bronchoscopy & Airway Exploration" : { "value" : "Virtual Bronchoscopy & Airway Exploration" },
+    "Select Model" : { "value" : "Select Model" },
+    "Start Navigation" : { "value" : "Start Navigation" },
+    "Stop Navigation" : { "value" : "Stop Navigation" },
+    "No model selected" : { "value" : "No model selected" }
+  }
+}

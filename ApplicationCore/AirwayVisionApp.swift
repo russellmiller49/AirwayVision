@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RealityKit
+import SwiftCSV
 
 @main
 struct AirwayVisionApp: App {
@@ -14,6 +15,7 @@ struct AirwayVisionApp: App {
     @StateObject private var appModel = AirwayAppModel()
     @StateObject private var navigationModel = BronchoscopyNavigationModel()
     @StateObject private var anchorModel = SpatialAnchorModel()
+    private let analytics = AnalyticsManager.shared
     
     var body: some Scene {
         WindowGroup {
@@ -139,14 +141,45 @@ class AirwayAppModel: ObservableObject {
     
     /// Load centerline data for navigation
     private func loadCenterlineData(for model: AirwayModel) async throws -> [CenterlinePoint] {
-        // Implementation will load JSON centerline data
-        let centerlinePath = Bundle.main.url(forResource: model.id, withExtension: "json", subdirectory: "PrebuiltModels/Centerlines")
-        guard let centerlinePath else {
+        // Load CSV centerline data
+        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "csv", subdirectory: "PrebuiltModels/Centerlines") else {
             throw AirwayVisionError.centerlineNotFound
         }
-        
-        let data = try Data(contentsOf: centerlinePath)
-        return try JSONDecoder().decode([CenterlinePoint].self, from: data)
+
+        let csv = try CSV(url: centerlineURL)
+        var points: [CenterlinePoint] = []
+        var previous: SIMD3<Float>? = nil
+
+        for row in csv.namedRows {
+            guard let posString = row["EndPointPosition"],
+                  let radiusString = row["Radius"],
+                  let cellId = row["CellId"],
+                  let posValues = Float.split(from: posString) else { continue }
+
+            let position = SIMD3<Float>(posValues[0], posValues[1], posValues[2])
+            let direction: SIMD3<Float>
+            if let prev = previous {
+                direction = normalize(position - prev)
+            } else {
+                direction = SIMD3<Float>(0, 0, -1)
+            }
+            previous = position
+
+            let point = CenterlinePoint(
+                position: position,
+                direction: direction,
+                radius: Float(radiusString) ?? 0,
+                generation: Int(cellId) ?? 0,
+                branchId: cellId,
+                distanceFromStart: 0,
+                anatomicalLabel: nil,
+                pathologyInfo: nil,
+                landmarks: nil
+            )
+            points.append(point)
+        }
+
+        return points
     }
     
     /// Load annotation entities for educational features

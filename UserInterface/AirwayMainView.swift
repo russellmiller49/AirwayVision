@@ -26,11 +26,11 @@ struct AirwayMainView: View {
                 
                 // Header
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("AirwayVision")
+                    Text(LocalizedStringKey("AirwayVision"))
                         .font(.title)
                         .fontWeight(.bold)
                     
-                    Text("Virtual Bronchoscopy & Airway Exploration")
+                    Text(LocalizedStringKey("Virtual Bronchoscopy & Airway Exploration"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -118,13 +118,13 @@ struct AirwayMainView: View {
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(8)
             } else {
-                Text("No model selected")
+                Text(LocalizedStringKey("No model selected"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .italic()
             }
             
-            Button("Select Model") {
+            Button(LocalizedStringKey("Select Model")) {
                 showingModelSelector = true
             }
             .buttonStyle(.borderedProminent)
@@ -139,7 +139,7 @@ struct AirwayMainView: View {
             
             if navigationModel.navigationState == .idle {
                 VStack(spacing: 8) {
-                    Button("Start Navigation") {
+                    Button(LocalizedStringKey("Start Navigation")) {
                         Task {
                             navigationModel.startNavigation()
                         }
@@ -234,7 +234,7 @@ struct AirwayMainView: View {
                 ), in: 0.1...3.0, step: 0.1)
             }
             
-            Button("Stop Navigation") {
+            Button(LocalizedStringKey("Stop Navigation")) {
                 navigationModel.resetToTrachea()
             }
             .buttonStyle(.bordered)
