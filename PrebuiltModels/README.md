@@ -36,7 +36,7 @@ PrebuiltModels/
 ### Mesh Files (.usd)
 - Universal Scene Description format for RealityKit
 - Optimized for Vision Pro rendering
-- Multiple LOD levels included
+- Two LOD resolutions (low/high) with ASTC 6×6 textures
 - Physically-based materials
 
 ### Centerline Files (.json)

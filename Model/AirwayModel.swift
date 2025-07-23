@@ -22,7 +22,7 @@ struct AirwayModel: Identifiable, Codable {
     
     /// File paths for associated data
     var meshPath: String { "PrebuiltModels/Meshes/\(id).usd" }
-    var centerlinePath: String { "PrebuiltModels/Centerlines/\(id).json" }
+    var centerlinePath: String { "PrebuiltModels/Centerlines/\(id).csv" }
     var annotationPath: String { "PrebuiltModels/Annotations/\(id).json" }
     var texturePath: String? { "PrebuiltModels/Textures/\(id)_texture.jpg" }
 }

@@ -9,6 +9,7 @@ import Foundation
 import RealityKit
 import simd
 import Combine
+import SwiftCSV
 
 /// Enhanced bronchoscopy navigation model with pre-built data
 @MainActor
@@ -251,12 +252,61 @@ class BronchoscopyNavigationModel: ObservableObject {
     }
     
     private func loadCenterlineData(for model: AirwayModel) async throws -> [AirwayBranch] {
-        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "json", subdirectory: "PrebuiltModels/Centerlines") else {
+        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "csv", subdirectory: "PrebuiltModels/Centerlines") else {
             throw AirwayVisionError.centerlineNotFound
         }
-        
-        let data = try Data(contentsOf: centerlineURL)
-        return try JSONDecoder().decode([AirwayBranch].self, from: data)
+
+        let csv = try CSV(url: centerlineURL)
+        var points: [CenterlinePoint] = []
+        var previous: SIMD3<Float>? = nil
+
+        for row in csv.namedRows {
+            guard let posString = row["EndPointPosition"],
+                  let radiusString = row["Radius"],
+                  let cellId = row["CellId"],
+                  let posValues = Float.split(from: posString) else { continue }
+
+            let position = SIMD3<Float>(posValues[0], posValues[1], posValues[2])
+            let direction: SIMD3<Float>
+            if let prev = previous {
+                direction = normalize(position - prev)
+            } else {
+                direction = SIMD3<Float>(0, 0, -1)
+            }
+            previous = position
+
+            let point = CenterlinePoint(
+                position: position,
+                direction: direction,
+                radius: Float(radiusString) ?? 0,
+                generation: Int(cellId) ?? 0,
+                branchId: cellId,
+                distanceFromStart: 0,
+                anatomicalLabel: nil,
+                pathologyInfo: nil,
+                landmarks: nil
+            )
+            points.append(point)
+        }
+
+        // Wrap points into a single branch for navigation
+        let info = BranchAnatomicalInfo(
+            standardName: "Trachea",
+            alternativeNames: [],
+            clinicalRelevance: "",
+            commonFindings: [],
+            normalDimensions: nil
+        )
+        let branch = AirwayBranch(
+            id: "trachea",
+            name: "Trachea",
+            parentId: nil,
+            childIds: [],
+            generation: 0,
+            centerlinePoints: points,
+            anatomicalInfo: info
+        )
+        return [branch]
     }
     
     private func buildAirwayTree(from branches: [AirwayBranch]) throws -> AirwayTree {
