@@ -1,0 +1,10 @@
+{
+  "info" : { "version" : 1, "author" : "xcode" },
+  "properties" : {
+    "pre-rendered" : true
+  },
+  "images" : [
+    { "filename" : "AppIconSquare.png", "idiom" : "vision", "scale" : "1x" },
+    { "filename" : "AppIconCircular.png", "idiom" : "vision", "scale" : "1x", "role" : "mask" }
+  ]
+}
