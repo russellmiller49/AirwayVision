@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "strings": {
+    "AirwayVision": { "localizations": { "en": { "stringUnit": "AirwayVision" } } },
+    "Virtual Bronchoscopy & Airway Exploration": { "localizations": { "en": { "stringUnit": "Virtual Bronchoscopy & Airway Exploration" } } },
+    "Airway Models": { "localizations": { "en": { "stringUnit": "Airway Models" } } },
+    "Guided Tours": { "localizations": { "en": { "stringUnit": "Guided Tours" } } },
+    "Anatomical Labels": { "localizations": { "en": { "stringUnit": "Anatomical Labels" } } },
+    "Pathology Highlights": { "localizations": { "en": { "stringUnit": "Pathology Highlights" } } },
+    "Status": { "localizations": { "en": { "stringUnit": "Status" } } }
+  }
+}

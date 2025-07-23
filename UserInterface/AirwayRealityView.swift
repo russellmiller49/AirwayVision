@@ -7,6 +7,8 @@
 
 import SwiftUI
 import RealityKit
+import Accessibility
+import CodableCSV
 import ARKit
 
 struct AirwayRealityView: View {
@@ -39,6 +41,7 @@ struct AirwayRealityView: View {
             // Add gesture support for navigation
             navigationGestures
         )
+        .compositingMode(.foveated)
     }
     
     // MARK: - Gestures
@@ -185,20 +188,35 @@ struct AirwayRealityView: View {
         // Add gesture components for interaction
         entity.components.set(InputTargetComponent())
         entity.components.set(CollisionComponent(shapes: [.generateConvex(from: entity.model!.mesh)]))
+        entity.components.set(AccessibilityComponent(label: model.name, value: "Airway mesh"))
         
         return entity
     }
     
     private func loadCenterlineData(for model: AirwayModel) async throws -> [CenterlinePoint] {
-        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "json", subdirectory: "PrebuiltModels/Centerlines") else {
+        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "csv", subdirectory: "PrebuiltModels/Centerlines") else {
             throw AirwayVisionError.centerlineNotFound
         }
-        
+
         let data = try Data(contentsOf: centerlineURL)
-        let branches = try JSONDecoder().decode([AirwayBranch].self, from: data)
-        
-        // Flatten all centerline points
-        return branches.flatMap { $0.centerlinePoints }
+        struct Row: Decodable {
+            let StartPointPosition: String
+            let EndPointPosition: String
+            let Radius: Float
+        }
+        let decoder = CSVDecoder { $0.delimiters.field = "\t" }
+        let rows = try decoder.decode([Row].self, from: data)
+        var points: [CenterlinePoint] = []
+        for row in rows {
+            let start = row.StartPointPosition.split(separator: " ").compactMap { Float($0) }
+            let end = row.EndPointPosition.split(separator: " ").compactMap { Float($0) }
+            guard start.count == 3 && end.count == 3 else { continue }
+            let s = SIMD3<Float>(start[0], start[1], start[2])
+            let e = SIMD3<Float>(end[0], end[1], end[2])
+            let dir = normalize(e - s)
+            points.append(CenterlinePoint(position: e, direction: dir, radius: row.Radius, generation: 0, branchId: model.id, distanceFromStart: 0))
+        }
+        return points
     }
     
     private func createCenterlineVisualization(from points: [CenterlinePoint]) -> Entity {
@@ -235,6 +253,7 @@ struct AirwayRealityView: View {
         let mesh = MeshResource.generateCylinder(height: length, radius: 0.001)
         let material = UnlitMaterial(color: .blue.withAlphaComponent(0.6))
         entity.components.set(ModelComponent(mesh: mesh, materials: [material]))
+        entity.components.set(AccessibilityComponent(label: "Centerline segment", value: ""))
         
         // Orient the cylinder along the direction
         let up = SIMD3<Float>(0, 1, 0)
@@ -253,6 +272,7 @@ struct AirwayRealityView: View {
         let mesh = MeshResource.generateSphere(radius: 0.003)
         let material = SimpleMaterial(color: .yellow, isMetallic: false)
         entity.components.set(ModelComponent(mesh: mesh, materials: [material]))
+        entity.components.set(AccessibilityComponent(label: point.anatomicalLabel ?? "Landmark", value: "Generation \(point.generation)"))
         
         // Add text label if available
         if let label = point.anatomicalLabel {
@@ -504,6 +524,7 @@ struct AirwayRealityView: View {
         let mesh = MeshResource.generateBox(size: [0.02, 0.02, 0.02])
         let material = UnlitMaterial(color: .orange.withAlphaComponent(0.7))
         anchorEntity.components.set(ModelComponent(mesh: mesh, materials: [material]))
+        anchorEntity.components.set(AccessibilityComponent(label: "Spatial anchor", value: ""))
         
         content.add(anchorEntity)
     }

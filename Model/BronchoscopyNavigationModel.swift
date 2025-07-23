@@ -9,6 +9,7 @@ import Foundation
 import RealityKit
 import simd
 import Combine
+import CodableCSV
 
 /// Enhanced bronchoscopy navigation model with pre-built data
 @MainActor
@@ -251,12 +252,31 @@ class BronchoscopyNavigationModel: ObservableObject {
     }
     
     private func loadCenterlineData(for model: AirwayModel) async throws -> [AirwayBranch] {
-        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "json", subdirectory: "PrebuiltModels/Centerlines") else {
+        guard let centerlineURL = Bundle.main.url(forResource: model.id, withExtension: "csv", subdirectory: "PrebuiltModels/Centerlines") else {
             throw AirwayVisionError.centerlineNotFound
         }
-        
+
         let data = try Data(contentsOf: centerlineURL)
-        return try JSONDecoder().decode([AirwayBranch].self, from: data)
+        struct Row: Decodable {
+            let StartPointPosition: String
+            let EndPointPosition: String
+            let Radius: Float
+        }
+        let decoder = CSVDecoder { $0.delimiters.field = "\t" }
+        let rows = try decoder.decode([Row].self, from: data)
+        // Build simple branches from sequential points
+        var points: [CenterlinePoint] = []
+        for row in rows {
+            let start = row.StartPointPosition.split(separator: " ").compactMap { Float($0) }
+            let end = row.EndPointPosition.split(separator: " ").compactMap { Float($0) }
+            guard start.count == 3 && end.count == 3 else { continue }
+            let s = SIMD3<Float>(start[0], start[1], start[2])
+            let e = SIMD3<Float>(end[0], end[1], end[2])
+            let dir = normalize(e - s)
+            points.append(CenterlinePoint(position: e, direction: dir, radius: row.Radius, generation: 0, branchId: model.id, distanceFromStart: 0))
+        }
+        let branch = AirwayBranch(id: model.id, name: model.name, parentId: nil, childIds: [], generation: 0, centerlinePoints: points, anatomicalInfo: BranchAnatomicalInfo(standardName: model.name, alternativeNames: [], clinicalRelevance: "", commonFindings: [], normalDimensions: nil))
+        return [branch]
     }
     
     private func buildAirwayTree(from branches: [AirwayBranch]) throws -> AirwayTree {

@@ -54,6 +54,7 @@ struct AirwayImmersiveView: View {
                 }
             }
         }
+        .compositingMode(.foveated)
         .gesture(immersiveGestures)
     }
     

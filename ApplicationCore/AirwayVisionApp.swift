@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RealityKit
+import CodableCSV
 
 @main
 struct AirwayVisionApp: App {
@@ -139,14 +140,31 @@ class AirwayAppModel: ObservableObject {
     
     /// Load centerline data for navigation
     private func loadCenterlineData(for model: AirwayModel) async throws -> [CenterlinePoint] {
-        // Implementation will load JSON centerline data
-        let centerlinePath = Bundle.main.url(forResource: model.id, withExtension: "json", subdirectory: "PrebuiltModels/Centerlines")
+        // Load centerline CSV data
+        let centerlinePath = Bundle.main.url(forResource: model.id, withExtension: "csv", subdirectory: "PrebuiltModels/Centerlines")
         guard let centerlinePath else {
             throw AirwayVisionError.centerlineNotFound
         }
-        
+
         let data = try Data(contentsOf: centerlinePath)
-        return try JSONDecoder().decode([CenterlinePoint].self, from: data)
+        struct Row: Decodable {
+            let StartPointPosition: String
+            let EndPointPosition: String
+            let Radius: Float
+        }
+        let decoder = CSVDecoder { $0.delimiters.field = "\t" }
+        let rows = try decoder.decode([Row].self, from: data)
+        var points: [CenterlinePoint] = []
+        for row in rows {
+            let start = row.StartPointPosition.split(separator: " ").compactMap { Float($0) }
+            let end = row.EndPointPosition.split(separator: " ").compactMap { Float($0) }
+            guard start.count == 3 && end.count == 3 else { continue }
+            let s = SIMD3<Float>(start[0], start[1], start[2])
+            let e = SIMD3<Float>(end[0], end[1], end[2])
+            let dir = normalize(e - s)
+            points.append(CenterlinePoint(position: e, direction: dir, radius: row.Radius, generation: 0, branchId: model.id, distanceFromStart: 0))
+        }
+        return points
     }
     
     /// Load annotation entities for educational features
